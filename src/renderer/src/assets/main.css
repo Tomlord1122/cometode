@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Custom theme variables */
+:root {
+  --color-bg: theme(colors.white);
+  --color-text: theme(colors.gray.900);
+  --color-text-secondary: theme(colors.gray.600);
+  --color-border: theme(colors.gray.200);
+  --color-primary: theme(colors.blue.600);
+  --color-primary-hover: theme(colors.blue.700);
+  --color-success: theme(colors.green.600);
+  --color-warning: theme(colors.yellow.600);
+  --color-danger: theme(colors.red.600);
+}
+
+.dark {
+  --color-bg: theme(colors.gray.900);
+  --color-text: theme(colors.gray.100);
+  --color-text-secondary: theme(colors.gray.400);
+  --color-border: theme(colors.gray.700);
+  --color-primary: theme(colors.blue.500);
+  --color-primary-hover: theme(colors.blue.400);
+}
+
+/* Base styles */
+body {
+  @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+  @apply font-sans antialiased;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
+}
+
+/* Utility classes */
+.btn {
+  @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+  @apply focus:ring-blue-500;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100;
+  @apply hover:bg-gray-300 dark:hover:bg-gray-600;
+  @apply focus:ring-gray-500;
+}
+
+.card {
+  @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm;
+  @apply border border-gray-200 dark:border-gray-700;
+}
+
+/* Difficulty badges */
+.badge-easy {
+  @apply bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200;
+}
+
+.badge-medium {
+  @apply bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200;
+}
+
+.badge-hard {
+  @apply bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200;
+}

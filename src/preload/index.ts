@@ -1,0 +1,58 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { electronAPI } from '@electron-toolkit/preload'
+
+// Custom APIs for renderer
+const api = {
+  // Problems
+  getProblems: (filters?: {
+    difficulty?: string
+    category?: string
+    status?: string
+    searchText?: string
+    dueOnly?: boolean
+  }) => ipcRenderer.invoke('get-problems', filters),
+
+  getProblem: (problemId: number) => ipcRenderer.invoke('get-problem', problemId),
+
+  getTodayReviews: () => ipcRenderer.invoke('get-today-reviews'),
+
+  startProblem: (problemId: number) => ipcRenderer.invoke('start-problem', problemId),
+
+  // Reviews
+  submitReview: (data: { problemId: number; quality: number }) =>
+    ipcRenderer.invoke('submit-review', data),
+
+  // Notes
+  updateNote: (data: { problemId: number; content: string }) =>
+    ipcRenderer.invoke('update-note', data),
+
+  // Stats
+  getStats: () => ipcRenderer.invoke('get-stats'),
+
+  // Categories
+  getCategories: () => ipcRenderer.invoke('get-categories'),
+
+  // Preferences
+  savePreference: (data: { key: string; value: string }) =>
+    ipcRenderer.invoke('save-preference', data),
+
+  getPreference: (key: string) => ipcRenderer.invoke('get-preference', key),
+
+  // Reset
+  resetAllProgress: () => ipcRenderer.invoke('reset-all-progress')
+}
+
+// Expose APIs
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('api', api)
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  // @ts-ignore (define in dts)
+  window.electron = electronAPI
+  // @ts-ignore (define in dts)
+  window.api = api
+}

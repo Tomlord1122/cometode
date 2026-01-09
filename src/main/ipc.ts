@@ -1,0 +1,402 @@
+import { ipcMain } from 'electron'
+import type Database from 'better-sqlite3'
+import { calculateNextReview, formatReviewDate, INITIAL_EASE_FACTOR } from './lib/sm2'
+
+// Types
+interface ProblemFilters {
+  difficulty?: string
+  category?: string
+  status?: string
+  searchText?: string
+  dueOnly?: boolean
+}
+
+interface ReviewSubmission {
+  problemId: number
+  quality: number
+}
+
+interface NoteUpdate {
+  problemId: number
+  content: string
+}
+
+interface PreferenceData {
+  key: string
+  value: string
+}
+
+export function setupIPC(db: Database.Database): void {
+  // Get all problems with progress
+  ipcMain.handle('get-problems', (_event, filters?: ProblemFilters) => {
+    let query = `
+      SELECT
+        p.id,
+        p.neet_id,
+        p.title,
+        p.difficulty,
+        p.categories,
+        p.tags,
+        p.leetcode_url,
+        p.neetcode_url,
+        COALESCE(pp.status, 'new') as status,
+        COALESCE(pp.repetitions, 0) as repetitions,
+        COALESCE(pp.interval, 0) as interval,
+        COALESCE(pp.ease_factor, ${INITIAL_EASE_FACTOR}) as ease_factor,
+        pp.next_review_date,
+        COALESCE(pp.total_reviews, 0) as total_reviews,
+        pp.last_reviewed_at,
+        n.content as notes
+      FROM problems p
+      LEFT JOIN problem_progress pp ON p.id = pp.problem_id
+      LEFT JOIN notes n ON p.id = n.problem_id
+      WHERE 1=1
+    `
+
+    const params: (string | number)[] = []
+
+    if (filters?.difficulty) {
+      query += ' AND p.difficulty = ?'
+      params.push(filters.difficulty)
+    }
+
+    if (filters?.category) {
+      query += ' AND p.categories LIKE ?'
+      params.push(`%${filters.category}%`)
+    }
+
+    if (filters?.status && filters.status !== 'all') {
+      if (filters.status === 'new') {
+        query += ' AND (pp.status IS NULL OR pp.status = "new")'
+      } else {
+        query += ' AND pp.status = ?'
+        params.push(filters.status)
+      }
+    }
+
+    if (filters?.searchText) {
+      query += ' AND (p.title LIKE ? OR CAST(p.neet_id AS TEXT) LIKE ?)'
+      params.push(`%${filters.searchText}%`, `%${filters.searchText}%`)
+    }
+
+    if (filters?.dueOnly) {
+      query += " AND pp.next_review_date IS NOT NULL AND DATE(pp.next_review_date) <= DATE('now')"
+    }
+
+    query += ' ORDER BY p.neet_id ASC'
+
+    const stmt = db.prepare(query)
+    return stmt.all(...params)
+  })
+
+  // Get single problem by ID
+  ipcMain.handle('get-problem', (_event, problemId: number) => {
+    const query = `
+      SELECT
+        p.id,
+        p.neet_id,
+        p.title,
+        p.difficulty,
+        p.categories,
+        p.tags,
+        p.leetcode_url,
+        p.neetcode_url,
+        COALESCE(pp.status, 'new') as status,
+        COALESCE(pp.repetitions, 0) as repetitions,
+        COALESCE(pp.interval, 0) as interval,
+        COALESCE(pp.ease_factor, ${INITIAL_EASE_FACTOR}) as ease_factor,
+        pp.next_review_date,
+        COALESCE(pp.total_reviews, 0) as total_reviews,
+        pp.last_reviewed_at,
+        n.content as notes
+      FROM problems p
+      LEFT JOIN problem_progress pp ON p.id = pp.problem_id
+      LEFT JOIN notes n ON p.id = n.problem_id
+      WHERE p.id = ?
+    `
+    return db.prepare(query).get(problemId)
+  })
+
+  // Get today's due reviews
+  ipcMain.handle('get-today-reviews', () => {
+    const query = `
+      SELECT
+        p.id,
+        p.neet_id,
+        p.title,
+        p.difficulty,
+        p.leetcode_url,
+        p.neetcode_url,
+        pp.repetitions,
+        pp.ease_factor,
+        pp.next_review_date
+      FROM problems p
+      JOIN problem_progress pp ON p.id = pp.problem_id
+      WHERE DATE(pp.next_review_date) <= DATE('now')
+        AND pp.status != 'new'
+      ORDER BY pp.ease_factor ASC, p.neet_id ASC
+    `
+    return db.prepare(query).all()
+  })
+
+  // Submit review result
+  ipcMain.handle('submit-review', (_event, data: ReviewSubmission) => {
+    const { problemId, quality } = data
+
+    // Get current progress
+    const progress = db
+      .prepare(
+        `
+      SELECT repetitions, interval, ease_factor
+      FROM problem_progress
+      WHERE problem_id = ?
+    `
+      )
+      .get(problemId) as { repetitions: number; interval: number; ease_factor: number } | undefined
+
+    const currentState = {
+      repetitions: progress?.repetitions ?? 0,
+      interval: progress?.interval ?? 0,
+      easeFactor: progress?.ease_factor ?? INITIAL_EASE_FACTOR
+    }
+
+    // Calculate new state
+    const { newState, nextReviewDate } = calculateNextReview(currentState, quality)
+    const nextReviewStr = formatReviewDate(nextReviewDate)
+
+    // Determine status
+    let status = 'learning'
+    if (newState.repetitions >= 3) {
+      status = 'reviewing'
+    }
+
+    // Transaction: update progress and record history
+    const transaction = db.transaction(() => {
+      // Upsert progress
+      db.prepare(
+        `
+        INSERT INTO problem_progress
+        (problem_id, status, repetitions, interval, ease_factor, next_review_date, last_reviewed_at, total_reviews, first_learned_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), 1, datetime('now'))
+        ON CONFLICT(problem_id) DO UPDATE SET
+          status = excluded.status,
+          repetitions = excluded.repetitions,
+          interval = excluded.interval,
+          ease_factor = excluded.ease_factor,
+          next_review_date = excluded.next_review_date,
+          last_reviewed_at = excluded.last_reviewed_at,
+          total_reviews = total_reviews + 1
+      `
+      ).run(
+        problemId,
+        status,
+        newState.repetitions,
+        newState.interval,
+        newState.easeFactor,
+        nextReviewStr
+      )
+
+      // Record history
+      db.prepare(
+        `
+        INSERT INTO review_history
+        (problem_id, quality, interval_before, interval_after, ease_factor_before, ease_factor_after)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+      ).run(
+        problemId,
+        quality,
+        currentState.interval,
+        newState.interval,
+        currentState.easeFactor,
+        newState.easeFactor
+      )
+    })
+
+    transaction()
+
+    return {
+      success: true,
+      nextReviewDate: nextReviewStr,
+      newInterval: newState.interval
+    }
+  })
+
+  // Update note
+  ipcMain.handle('update-note', (_event, data: NoteUpdate) => {
+    db.prepare(
+      `
+      INSERT INTO notes (problem_id, content, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(problem_id) DO UPDATE SET
+        content = excluded.content,
+        updated_at = excluded.updated_at
+    `
+    ).run(data.problemId, data.content)
+
+    return { success: true }
+  })
+
+  // Get statistics
+  ipcMain.handle('get-stats', () => {
+    const total = db.prepare('SELECT COUNT(*) as count FROM problems').get() as { count: number }
+
+    const byDifficulty = db
+      .prepare(
+        `
+      SELECT
+        p.difficulty,
+        COUNT(*) as total,
+        SUM(CASE WHEN pp.total_reviews > 0 THEN 1 ELSE 0 END) as practiced,
+        SUM(CASE WHEN pp.repetitions >= 3 THEN 1 ELSE 0 END) as mastered
+      FROM problems p
+      LEFT JOIN problem_progress pp ON p.id = pp.problem_id
+      GROUP BY p.difficulty
+      ORDER BY
+        CASE p.difficulty
+          WHEN 'Easy' THEN 1
+          WHEN 'Medium' THEN 2
+          WHEN 'Hard' THEN 3
+        END
+    `
+      )
+      .all()
+
+    const byCategory = db
+      .prepare(
+        `
+      SELECT
+        json_each.value as category,
+        COUNT(*) as total,
+        SUM(CASE WHEN pp.total_reviews > 0 THEN 1 ELSE 0 END) as practiced
+      FROM problems p, json_each(p.categories)
+      LEFT JOIN problem_progress pp ON p.id = pp.problem_id
+      GROUP BY json_each.value
+      ORDER BY total DESC
+    `
+      )
+      .all()
+
+    const todayDue = db
+      .prepare(
+        `
+      SELECT COUNT(*) as count
+      FROM problem_progress
+      WHERE DATE(next_review_date) <= DATE('now')
+        AND status != 'new'
+    `
+      )
+      .get() as { count: number }
+
+    const reviewHistory = db
+      .prepare(
+        `
+      SELECT
+        DATE(review_date) as date,
+        COUNT(*) as count
+      FROM review_history
+      GROUP BY DATE(review_date)
+      ORDER BY date DESC
+      LIMIT 30
+    `
+      )
+      .all()
+
+    const totalReviews = db.prepare('SELECT COUNT(*) as count FROM review_history').get() as {
+      count: number
+    }
+
+    const practiced = db
+      .prepare(
+        `
+      SELECT COUNT(*) as count
+      FROM problem_progress
+      WHERE total_reviews > 0
+    `
+      )
+      .get() as { count: number }
+
+    return {
+      total: total.count,
+      practiced: practiced.count,
+      todayDue: todayDue.count,
+      totalReviews: totalReviews.count,
+      byDifficulty,
+      byCategory,
+      reviewHistory
+    }
+  })
+
+  // Get categories list
+  ipcMain.handle('get-categories', () => {
+    const categories = db
+      .prepare(
+        `
+      SELECT DISTINCT json_each.value as category
+      FROM problems p, json_each(p.categories)
+      ORDER BY category
+    `
+      )
+      .all()
+    return categories.map((c: { category: string }) => c.category)
+  })
+
+  // Save preference
+  ipcMain.handle('save-preference', (_event, data: PreferenceData) => {
+    db.prepare(
+      `
+      INSERT INTO preferences (key, value, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = excluded.updated_at
+    `
+    ).run(data.key, data.value)
+
+    return { success: true }
+  })
+
+  // Get preference
+  ipcMain.handle('get-preference', (_event, key: string) => {
+    const result = db.prepare('SELECT value FROM preferences WHERE key = ?').get(key) as
+      | { value: string }
+      | undefined
+    return result?.value ?? null
+  })
+
+  // Mark problem as started (first time opening)
+  ipcMain.handle('start-problem', (_event, problemId: number) => {
+    const existing = db
+      .prepare('SELECT id FROM problem_progress WHERE problem_id = ?')
+      .get(problemId)
+
+    if (!existing) {
+      // Create initial progress with "learning" status and schedule for today
+      const today = new Date().toISOString().split('T')[0]
+      db.prepare(
+        `
+        INSERT INTO problem_progress
+        (problem_id, status, repetitions, interval, ease_factor, next_review_date, first_learned_at)
+        VALUES (?, 'learning', 0, 0, ${INITIAL_EASE_FACTOR}, ?, datetime('now'))
+      `
+      ).run(problemId, today)
+    }
+
+    return { success: true }
+  })
+
+  // Reset all progress
+  ipcMain.handle('reset-all-progress', () => {
+    const transaction = db.transaction(() => {
+      // Delete all progress data
+      db.prepare('DELETE FROM problem_progress').run()
+      // Delete all review history
+      db.prepare('DELETE FROM review_history').run()
+      // Keep notes - user might want to preserve them
+    })
+
+    transaction()
+
+    return { success: true }
+  })
+}
