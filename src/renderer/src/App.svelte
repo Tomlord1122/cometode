@@ -7,6 +7,7 @@
   import { loadStats } from './stores/stats'
   import { theme } from './stores/theme'
   import type { Problem } from '../../preload/index.d'
+  import cometlineLogo from './assets/Cometline.png'
 
   type View = 'home' | 'problem'
 
@@ -154,7 +155,8 @@
 <div class="h-screen flex flex-col bg-white dark:bg-gray-900 overflow-hidden">
   <!-- Header -->
   <header class="h-10 flex items-center justify-between px-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur flex-shrink-0">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5">
+      <img src={cometlineLogo} alt="Cometode" class="w-5 h-5" />
       <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">Cometode</span>
       {#if $todayReviews.length > 0 && currentView === 'home'}
         <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
