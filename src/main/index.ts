@@ -229,7 +229,7 @@ function setupPopupIPC(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.tomlord.comet-neetcode')
+  electronApp.setAppUserModelId('com.tomlord.cometode')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
