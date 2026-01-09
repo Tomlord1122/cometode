@@ -90,7 +90,7 @@
       </div>
       <div class="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
-          class="h-full bg-green-500 transition-all duration-500"
+          class="h-full bg-emerald-400/90 transition-all duration-500"
           style="width: {progressPercentage}%"
         ></div>
       </div>
@@ -130,7 +130,7 @@
                 {#each ['Easy', 'Medium', 'Hard'] as diff}
                   <button
                     onclick={() => selectedDifficulty = selectedDifficulty === diff ? null : diff}
-                    class="flex-1 px-2 py-1 text-xs rounded transition-colors {selectedDifficulty === diff ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'}"
+                    class="flex-1 px-2 py-1 text-xs rounded transition-colors {selectedDifficulty === diff ? 'bg-indigo-400/90 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'}"
                   >
                     {diff}
                   </button>

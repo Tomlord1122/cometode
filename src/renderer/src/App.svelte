@@ -190,7 +190,7 @@
         </label>
         <div class="flex gap-2">
           {#if isRecordingShortcut}
-            <div class="flex-1 px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-500 rounded-md text-center text-blue-700 dark:text-blue-300 animate-pulse">
+            <div class="flex-1 px-3 py-2 text-sm bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-400 rounded-md text-center text-indigo-700 dark:text-indigo-300 animate-pulse">
               {recordedKeys.length > 0 ? formatShortcutDisplay(recordedKeys.join('+')) : 'Press keys...'}
             </div>
           {:else}
@@ -200,7 +200,7 @@
           {/if}
           <button
             onclick={startRecordingShortcut}
-            class="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
+            class="px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-md transition-colors"
           >
             {isRecordingShortcut ? 'Cancel' : 'Change'}
           </button>
@@ -214,7 +214,7 @@
       <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
         <button
           onclick={() => { closeSettings(); handleReset(); }}
-          class="w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md transition-colors"
+          class="w-full px-3 py-2 text-sm font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-md transition-colors"
         >
           Reset All Progress
         </button>
@@ -228,8 +228,8 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 mx-4 max-w-xs w-full">
       <div class="text-center">
-        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-          <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+          <svg class="w-6 h-6 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
@@ -246,7 +246,7 @@
           <button
             onclick={confirmReset}
             disabled={isResetting}
-            class="flex-1 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors disabled:opacity-50"
+            class="flex-1 px-3 py-2 text-sm font-medium text-white bg-rose-500/90 hover:bg-rose-600/95 rounded-md transition-colors shadow-sm disabled:opacity-50"
           >
             {isResetting ? 'Resetting...' : 'Reset'}
           </button>
