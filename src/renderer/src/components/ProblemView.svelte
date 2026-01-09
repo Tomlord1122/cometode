@@ -184,7 +184,7 @@
               <button
                 onclick={() => handleReview(option.value)}
                 disabled={isSubmitting}
-                class="py-2 {option.color} text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                class="py-2 {option.color} text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 border-gray-300" 
               >
                 <div>{option.label}</div>
                 <div class="text-xs opacity-75">{option.description}</div>

@@ -21,6 +21,7 @@ let tray: Tray | null = null
 let lastNotificationDate: string | null = null
 let currentShortcut: string = 'CommandOrControl+Shift+N'
 let updateReady: boolean = false
+let isQuitting: boolean = false
 
 const POPUP_WIDTH = 360
 const POPUP_HEIGHT = 520
@@ -50,6 +51,14 @@ function createPopupWindow(): void {
   // Hide when clicking outside
   popupWindow.on('blur', () => {
     popupWindow?.hide()
+  })
+
+  // Prevent Cmd+W from destroying the window - just hide it instead
+  popupWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      popupWindow?.hide()
+    }
   })
 
   // Open external links in browser
@@ -362,6 +371,11 @@ function setupAutoUpdater(): void {
     autoUpdater.checkForUpdatesAndNotify()
   }, 4 * 60 * 60 * 1000)
 }
+
+// Set flag before quitting to allow window to close
+app.on('before-quit', () => {
+  isQuitting = true
+})
 
 // Don't quit when all windows are closed - this is a menu bar app
 app.on('window-all-closed', () => {
