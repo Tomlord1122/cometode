@@ -128,6 +128,11 @@ function updateTrayMenu(): void {
       label: '🔄 Restart to Update',
       click: () => {
         isQuitting = true
+        // Destroy the popup window first to ensure clean shutdown
+        if (popupWindow) {
+          popupWindow.destroy()
+          popupWindow = null
+        }
         autoUpdater.quitAndInstall(false, true)
       }
     })
@@ -138,6 +143,11 @@ function updateTrayMenu(): void {
     label: 'Quit',
     click: () => {
       isQuitting = true
+      // Destroy the popup window first to ensure clean shutdown
+      if (popupWindow) {
+        popupWindow.destroy()
+        popupWindow = null
+      }
       if (updateReady) {
         autoUpdater.quitAndInstall(false, true)
       } else {
@@ -284,9 +294,16 @@ function setupPopupIPC(): void {
   ipcMain.handle('install-update', () => {
     if (updateReady) {
       isQuitting = true
-      setImmediate(() => {
+      // Use setTimeout to ensure IPC response is sent before quitting
+      setTimeout(() => {
+        // Destroy the popup window first to ensure clean shutdown
+        if (popupWindow) {
+          popupWindow.destroy()
+          popupWindow = null
+        }
+        // quitAndInstall with isSilent=false, isForceRunAfter=true
         autoUpdater.quitAndInstall(false, true)
-      })
+      }, 100)
       return { success: true }
     }
     return { success: false }
@@ -374,6 +391,12 @@ function setupAutoUpdater(): void {
       icon: icon
     })
     notification.on('click', () => {
+      isQuitting = true
+      // Destroy the popup window first to ensure clean shutdown
+      if (popupWindow) {
+        popupWindow.destroy()
+        popupWindow = null
+      }
       autoUpdater.quitAndInstall(false, true)
     })
     notification.show()
