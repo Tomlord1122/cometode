@@ -11,6 +11,7 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { initDatabase, closeDatabase, getDatabase } from './db'
 import { setupIPC } from './ipc'
@@ -264,10 +265,55 @@ app.whenReady().then(() => {
     checkAndShowNotification()
   }, 60 * 60 * 1000)
 
+  // Setup auto-updater (only in production)
+  if (!is.dev) {
+    setupAutoUpdater()
+  }
+
   app.on('activate', () => {
     togglePopup()
   })
 })
+
+// Auto-updater setup
+function setupAutoUpdater(): void {
+  // Check for updates silently
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', (info) => {
+    const notification = new Notification({
+      title: 'Update Available',
+      body: `Cometode v${info.version} is available. Downloading...`,
+      icon: icon
+    })
+    notification.show()
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    const notification = new Notification({
+      title: 'Update Ready',
+      body: `Cometode v${info.version} has been downloaded. It will be installed on restart.`,
+      icon: icon
+    })
+    notification.on('click', () => {
+      autoUpdater.quitAndInstall()
+    })
+    notification.show()
+  })
+
+  autoUpdater.on('error', (error) => {
+    console.error('Auto-updater error:', error)
+  })
+
+  // Check for updates on startup
+  autoUpdater.checkForUpdatesAndNotify()
+
+  // Check for updates every 4 hours
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify()
+  }, 4 * 60 * 60 * 1000)
+}
 
 // Don't quit when all windows are closed - this is a menu bar app
 app.on('window-all-closed', () => {

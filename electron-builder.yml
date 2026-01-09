@@ -28,6 +28,9 @@ mac:
     - target: dmg
       arch:
         - arm64
+    - target: zip
+      arch:
+        - arm64
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
