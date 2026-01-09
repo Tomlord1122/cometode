@@ -12,6 +12,7 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  - node_modules/better-sqlite3/**
 win:
   executableName: cometode
 nsis:
@@ -21,15 +22,13 @@ nsis:
   createDesktopShortcut: always
 mac:
   identity: "-"
+  hardenedRuntime: true
+  gatekeeperAssess: false
   target:
     - target: dmg
       arch:
-        - x64
         - arm64
-    - target: zip
-      arch:
-        - x64
-        - arm64
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
