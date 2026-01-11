@@ -76,7 +76,17 @@ export function setupIPC(db: Database.Database): void {
       query += " AND pp.next_review_date IS NOT NULL AND DATE(pp.next_review_date) <= DATE('now')"
     }
 
-    query += ' ORDER BY p.neet_id ASC'
+    // Sort order:
+    // 1. Due for review (has next_review_date <= today)
+    // 2. New/never practiced (total_reviews = 0 or NULL)
+    // 3. Then by problem number
+    query += ` ORDER BY
+      CASE
+        WHEN pp.next_review_date IS NOT NULL AND DATE(pp.next_review_date) <= DATE('now') THEN 0
+        WHEN COALESCE(pp.total_reviews, 0) = 0 THEN 1
+        ELSE 2
+      END ASC,
+      p.neet_id ASC`
 
     const stmt = db.prepare(query)
     return stmt.all(...params)
