@@ -25,13 +25,15 @@
   let updateInfo = $state<{ version: string; progress: number } | null>(null)
   let updateCheckInterval: ReturnType<typeof setInterval> | null = null
 
-  onMount(async () => {
-    await theme.init()
-    await loadTodayReviews()
-    // Load current shortcut
-    currentShortcut = await window.api.getShortcut()
-    // Check update status
-    await refreshUpdateStatus()
+  onMount(() => {
+    // Initialize async operations
+    const init = async (): Promise<void> => {
+      await theme.init()
+      await loadTodayReviews()
+      currentShortcut = await window.api.getShortcut()
+      await refreshUpdateStatus()
+    }
+    init()
 
     // Poll for update progress while downloading
     updateCheckInterval = setInterval(async () => {
@@ -57,7 +59,9 @@
     currentView = 'problem'
   }
 
-  function goHome(): void {
+  async function goHome(): Promise<void> {
+    // Ensure todayReviews is refreshed before switching view
+    await loadTodayReviews()
     selectedProblem = null
     currentView = 'home'
   }
@@ -154,7 +158,7 @@
 
 <div class="h-screen flex flex-col bg-white dark:bg-gray-900 overflow-hidden">
   <!-- Header -->
-  <header class="h-10 flex items-center justify-between px-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur flex-shrink-0">
+  <header class="h-10 flex items-center justify-between px-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur shrink-0">
     <div class="flex items-center gap-1.5">
       <img src={cometlineLogo} alt="Cometode" class="w-5 h-5" />
       <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">Cometode</span>
@@ -203,6 +207,7 @@
         <button
           onclick={closeSettings}
           class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Close settings"
         >
           <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -212,9 +217,9 @@
 
       <!-- Shortcut Setting -->
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Open Shortcut
-        </label>
+        </span>
         <div class="flex gap-2">
           {#if isRecordingShortcut}
             <div class="flex-1 px-3 py-2 text-sm bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-400 rounded-md text-center text-indigo-700 dark:text-indigo-300 animate-pulse">

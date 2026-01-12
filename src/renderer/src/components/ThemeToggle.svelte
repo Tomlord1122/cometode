@@ -1,17 +1,6 @@
 <script lang="ts">
   import { theme, type Theme } from '../stores/theme'
 
-  function getIcon(t: Theme): string {
-    switch (t) {
-      case 'light':
-        return 'sun'
-      case 'dark':
-        return 'moon'
-      case 'system':
-        return 'computer'
-    }
-  }
-
   function getLabel(t: Theme): string {
     switch (t) {
       case 'light':

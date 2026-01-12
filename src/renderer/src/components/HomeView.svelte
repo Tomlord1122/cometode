@@ -85,7 +85,7 @@
 <div class="flex flex-col h-full">
   <!-- Due Today Card -->
   {#if $todayReviews.length > 0}
-    <div class="mx-3 mt-3 p-3 bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg text-white">
+    <div class="mx-3 mt-3 p-3 bg-linear-to-r from-orange-500 to-amber-500 rounded-lg text-white">
       <div class="text-sm opacity-90">Due for review</div>
       <div class="text-2xl font-bold">{$todayReviews.length} problem{$todayReviews.length > 1 ? 's' : ''}</div>
       <button
@@ -152,7 +152,10 @@
         {#if showFilterMenu}
           <div
             class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10"
+            role="menu"
+            tabindex="-1"
             onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
           >
             <div class="p-2 border-b border-gray-200 dark:border-gray-700">
               <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Difficulty</div>
@@ -195,7 +198,9 @@
           <!-- Overlay to close menu on outside click -->
           <div
             class="fixed inset-0 z-0"
+            role="presentation"
             onclick={() => showFilterMenu = false}
+            onkeydown={(e) => { if (e.key === 'Escape') showFilterMenu = false }}
           ></div>
         {/if}
       </div>
@@ -211,7 +216,7 @@
         class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 text-left transition-colors"
       >
         <!-- Status Icon -->
-        <div class="w-5 flex-shrink-0">
+        <div class="w-5 shrink-0">
           {#if status === 'new'}
             <div class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600"></div>
           {:else if status === 'due'}
