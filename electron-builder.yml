@@ -38,7 +38,8 @@ mac:
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: true
+  notarize:
+    teamId: "W8PJ7773T8"
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
 linux:
