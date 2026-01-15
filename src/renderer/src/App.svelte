@@ -45,8 +45,17 @@
       }
     }, 1000)
 
+    // Refresh data when window becomes visible (e.g., popup shown after new day)
+    const handleVisibilityChange = async (): Promise<void> => {
+      if (document.visibilityState === 'visible') {
+        await Promise.all([loadTodayReviews(), loadProblems(), loadStats()])
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
       if (updateCheckInterval) clearInterval(updateCheckInterval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   })
 
