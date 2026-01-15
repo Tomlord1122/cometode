@@ -1,5 +1,6 @@
 import { ipcMain, dialog } from 'electron'
-import { writeFileSync, readFileSync } from 'fs'
+import { writeFileSync, readFileSync, existsSync } from 'fs'
+import path from 'path'
 import type Database from 'better-sqlite3'
 import { calculateNextReview, formatReviewDate, INITIAL_EASE_FACTOR } from './lib/sm2'
 import { app } from 'electron'
@@ -626,5 +627,194 @@ export function setupIPC(db: Database.Database): void {
     } catch (error) {
       return { success: false, error: String(error) }
     }
+  })
+
+  // ===== Auto-Sync Handlers =====
+
+  // Get auto-sync preferences
+  ipcMain.handle('get-auto-sync-preferences', () => {
+    const enabled = db.prepare('SELECT value FROM preferences WHERE key = ?').get('sync_enabled') as
+      | { value: string }
+      | undefined
+
+    const folderPath = db
+      .prepare('SELECT value FROM preferences WHERE key = ?')
+      .get('sync_folder_path') as { value: string } | undefined
+
+    const lastExport = db
+      .prepare('SELECT value FROM preferences WHERE key = ?')
+      .get('last_export_date') as { value: string } | undefined
+
+    const lastImport = db
+      .prepare('SELECT value FROM preferences WHERE key = ?')
+      .get('last_import_date') as { value: string } | undefined
+
+    return {
+      enabled: enabled?.value === 'true',
+      folderPath: folderPath?.value || null,
+      lastExportDate: lastExport?.value || null,
+      lastImportDate: lastImport?.value || null
+    }
+  })
+
+  // Set auto-sync preferences
+  ipcMain.handle(
+    'set-auto-sync-preferences',
+    (_event, data: { enabled: boolean; folderPath?: string }) => {
+      const transaction = db.transaction(() => {
+        db.prepare(
+          `
+        INSERT INTO preferences (key, value, updated_at)
+        VALUES ('sync_enabled', ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `
+        ).run(data.enabled ? 'true' : 'false')
+
+        if (data.folderPath !== undefined) {
+          db.prepare(
+            `
+          INSERT INTO preferences (key, value, updated_at)
+          VALUES ('sync_folder_path', ?, datetime('now'))
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+        `
+          ).run(data.folderPath)
+        }
+      })
+
+      transaction()
+      return { success: true }
+    }
+  )
+
+  // Show folder dialog for sync folder selection
+  ipcMain.handle('show-folder-dialog', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return result.filePaths[0] || null
+  })
+
+  // Perform auto-export to specified folder
+  ipcMain.handle('perform-auto-export', (_event, folderPath: string) => {
+    try {
+      // Get export data (same logic as export-progress)
+      const progress = db
+        .prepare(
+          `
+        SELECT
+          p.neet_id,
+          pp.status,
+          pp.repetitions,
+          pp.interval,
+          pp.ease_factor,
+          pp.next_review_date,
+          pp.first_learned_at,
+          pp.last_reviewed_at,
+          pp.total_reviews
+        FROM problem_progress pp
+        JOIN problems p ON pp.problem_id = p.id
+        WHERE pp.total_reviews > 0
+        ORDER BY p.neet_id
+      `
+        )
+        .all() as ExportProgressEntry[]
+
+      const history = db
+        .prepare(
+          `
+        SELECT
+          p.neet_id,
+          rh.review_date,
+          rh.quality,
+          rh.interval_before,
+          rh.interval_after,
+          rh.ease_factor_before,
+          rh.ease_factor_after
+        FROM review_history rh
+        JOIN problems p ON rh.problem_id = p.id
+        ORDER BY rh.review_date
+      `
+        )
+        .all() as ExportHistoryEntry[]
+
+      const exportData: ExportData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        appVersion: app.getVersion(),
+        progress,
+        history
+      }
+
+      const filePath = path.join(folderPath, 'cometode-progress.json')
+      writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf-8')
+
+      // Update last export date
+      db.prepare(
+        `
+        INSERT INTO preferences (key, value, updated_at)
+        VALUES ('last_export_date', ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `
+      ).run(new Date().toISOString())
+
+      return { success: true, exportedCount: progress.length }
+    } catch (error) {
+      console.error('Auto-export failed:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+  // Check if auto-import is needed (compare dates)
+  ipcMain.handle('check-auto-import', (_event, folderPath: string) => {
+    try {
+      const filePath = path.join(folderPath, 'cometode-progress.json')
+
+      // Check if file exists
+      if (!existsSync(filePath)) {
+        return { shouldImport: false, reason: 'File not found' }
+      }
+
+      // Read export file
+      const content = readFileSync(filePath, 'utf-8')
+      const exportData = JSON.parse(content) as ExportData
+
+      if (!exportData.exportDate) {
+        return { shouldImport: false, reason: 'Invalid file format' }
+      }
+
+      const exportDate = new Date(exportData.exportDate)
+
+      // Get max last_reviewed_at from DB
+      const maxReview = db
+        .prepare('SELECT MAX(last_reviewed_at) as max_date FROM problem_progress')
+        .get() as { max_date: string | null }
+
+      const maxLocalDate = maxReview.max_date ? new Date(maxReview.max_date) : null
+
+      // Compare dates - import if export is newer
+      const shouldImport = !maxLocalDate || exportDate > maxLocalDate
+
+      return {
+        shouldImport,
+        exportDate: exportData.exportDate,
+        maxLocalDate: maxLocalDate?.toISOString() || null,
+        data: shouldImport ? exportData : null
+      }
+    } catch (error) {
+      console.error('Auto-import check failed:', error)
+      return { shouldImport: false, reason: String(error) }
+    }
+  })
+
+  // Update last import date preference
+  ipcMain.handle('set-last-import-date', () => {
+    db.prepare(
+      `
+      INSERT INTO preferences (key, value, updated_at)
+      VALUES ('last_import_date', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `
+    ).run(new Date().toISOString())
+    return { success: true }
   })
 }

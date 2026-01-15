@@ -28,6 +28,13 @@
   let isImporting = $state(false)
   let importExportMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Auto-sync state
+  let autoSyncEnabled = $state(false)
+  let autoSyncFolderPath = $state<string | null>(null)
+  let lastExportDate = $state<string | null>(null)
+  let isSelectingFolder = $state(false)
+  let autoSyncMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null)
+
   onMount(() => {
     // Initialize async operations
     const init = async (): Promise<void> => {
@@ -35,6 +42,7 @@
       await loadTodayReviews()
       currentShortcut = await window.api.getShortcut()
       await refreshUpdateStatus()
+      await loadAutoSyncPreferences()
     }
     init()
 
@@ -222,6 +230,98 @@
       isImporting = false
     }
   }
+
+  // Auto-sync functions
+  async function loadAutoSyncPreferences(): Promise<void> {
+    try {
+      const prefs = await window.api.getAutoSyncPreferences()
+      autoSyncEnabled = prefs.enabled
+      autoSyncFolderPath = prefs.folderPath
+      lastExportDate = prefs.lastExportDate
+    } catch (error) {
+      console.error('Failed to load auto-sync preferences:', error)
+    }
+  }
+
+  async function handleToggleAutoSync(): Promise<void> {
+    const newEnabled = !autoSyncEnabled
+    autoSyncEnabled = newEnabled
+    autoSyncMessage = null
+
+    try {
+      await window.api.setAutoSyncPreferences({
+        enabled: newEnabled,
+        folderPath: autoSyncFolderPath || undefined
+      })
+
+      if (newEnabled && !autoSyncFolderPath) {
+        autoSyncMessage = { type: 'error', text: 'Please select a sync folder' }
+      }
+    } catch (error) {
+      autoSyncEnabled = !newEnabled
+      autoSyncMessage = { type: 'error', text: 'Failed to update setting' }
+    }
+  }
+
+  async function handleSelectSyncFolder(): Promise<void> {
+    isSelectingFolder = true
+    autoSyncMessage = null
+
+    try {
+      const folderPath = await window.api.showFolderDialog()
+
+      if (folderPath) {
+        autoSyncFolderPath = folderPath
+        await window.api.setAutoSyncPreferences({
+          enabled: autoSyncEnabled,
+          folderPath
+        })
+        autoSyncMessage = { type: 'success', text: 'Folder configured' }
+      }
+    } catch (error) {
+      autoSyncMessage = { type: 'error', text: 'Failed to select folder' }
+    } finally {
+      isSelectingFolder = false
+    }
+  }
+
+  async function handleManualSync(): Promise<void> {
+    if (!autoSyncFolderPath) {
+      autoSyncMessage = { type: 'error', text: 'No folder selected' }
+      return
+    }
+
+    autoSyncMessage = null
+
+    try {
+      const result = await window.api.performAutoExport(autoSyncFolderPath)
+      if (result.success) {
+        autoSyncMessage = { type: 'success', text: `Exported ${result.exportedCount} problems` }
+        await loadAutoSyncPreferences()
+      } else {
+        autoSyncMessage = { type: 'error', text: result.error || 'Export failed' }
+      }
+    } catch (error) {
+      autoSyncMessage = { type: 'error', text: 'Sync failed' }
+    }
+  }
+
+  function formatSyncDate(dateStr: string | null): string {
+    if (!dateStr) return 'Never'
+    const date = new Date(dateStr)
+    const today = new Date()
+    const isToday = date.toDateString() === today.toDateString()
+    if (isToday) {
+      return `Today ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    }
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  }
+
+  function getFolderDisplayName(path: string | null): string {
+    if (!path) return 'No folder selected'
+    const parts = path.split('/')
+    return parts[parts.length - 1] || path
+  }
 </script>
 
 <div class="h-screen flex flex-col bg-white dark:bg-gray-900 overflow-hidden">
@@ -388,6 +488,70 @@
         {/if}
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
           Transfer progress between devices
+        </p>
+      </div>
+
+      <!-- Auto Sync -->
+      <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Auto Sync
+          </span>
+          <button
+            onclick={handleToggleAutoSync}
+            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {autoSyncEnabled ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}"
+            role="switch"
+            aria-checked={autoSyncEnabled}
+            aria-label="Toggle auto sync"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {autoSyncEnabled ? 'translate-x-6' : 'translate-x-1'}"
+            ></span>
+          </button>
+        </div>
+
+        {#if autoSyncEnabled}
+          <div class="space-y-2 mb-3">
+            <div class="flex gap-2">
+              <div
+                class="flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-md truncate {autoSyncFolderPath ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'}"
+                title={autoSyncFolderPath || 'No folder selected'}
+              >
+                {getFolderDisplayName(autoSyncFolderPath)}
+              </div>
+              <button
+                onclick={handleSelectSyncFolder}
+                disabled={isSelectingFolder}
+                class="px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-md transition-colors disabled:opacity-50"
+              >
+                {isSelectingFolder ? '...' : 'Choose'}
+              </button>
+            </div>
+
+            {#if autoSyncFolderPath}
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                  Last sync: {formatSyncDate(lastExportDate)}
+                </span>
+                <button
+                  onclick={handleManualSync}
+                  class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Sync now
+                </button>
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if autoSyncMessage}
+          <p class="mb-2 text-xs {autoSyncMessage.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
+            {autoSyncMessage.text}
+          </p>
+        {/if}
+
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          Daily backup to Dropbox, iCloud, etc.
         </p>
       </div>
 

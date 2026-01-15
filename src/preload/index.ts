@@ -59,7 +59,16 @@ const api = {
   showSaveDialog: (defaultFileName: string) => ipcRenderer.invoke('show-save-dialog', defaultFileName),
   showOpenDialog: () => ipcRenderer.invoke('show-open-dialog'),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('write-file', filePath, content),
-  readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath)
+  readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
+
+  // Auto-Sync
+  getAutoSyncPreferences: () => ipcRenderer.invoke('get-auto-sync-preferences'),
+  setAutoSyncPreferences: (data: { enabled: boolean; folderPath?: string }) =>
+    ipcRenderer.invoke('set-auto-sync-preferences', data),
+  showFolderDialog: () => ipcRenderer.invoke('show-folder-dialog'),
+  performAutoExport: (folderPath: string) => ipcRenderer.invoke('perform-auto-export', folderPath),
+  checkAutoImport: (folderPath: string) => ipcRenderer.invoke('check-auto-import', folderPath),
+  setLastImportDate: () => ipcRenderer.invoke('set-last-import-date')
 }
 
 // Expose APIs

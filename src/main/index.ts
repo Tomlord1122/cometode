@@ -10,6 +10,8 @@ import {
   globalShortcut
 } from 'electron'
 import { join } from 'path'
+import path from 'path'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
@@ -23,6 +25,7 @@ let currentShortcut: string = 'CommandOrControl+Shift+N'
 let updateReady: boolean = false
 let isQuitting: boolean = false
 let updateInfo: { version: string; progress: number } | null = null
+let lastAutoExportDate: string | null = null
 
 const POPUP_WIDTH = 360
 const POPUP_HEIGHT = 520
@@ -371,6 +374,20 @@ app.whenReady().then(() => {
     checkAndShowNotification()
   }, 60 * 60 * 1000)
 
+  // Auto-sync: Check for import on startup (after a short delay to ensure UI is ready)
+  setTimeout(() => {
+    performAutoImportOnStartup()
+  }, 2000)
+
+  // Auto-sync: Check for daily export on startup and every hour
+  setTimeout(() => {
+    checkAndPerformAutoExport()
+  }, 5000)
+
+  setInterval(() => {
+    checkAndPerformAutoExport()
+  }, 60 * 60 * 1000)
+
   // Setup auto-updater (only in production)
   if (!is.dev) {
     setupAutoUpdater()
@@ -437,6 +454,299 @@ function setupAutoUpdater(): void {
   setInterval(() => {
     autoUpdater.checkForUpdatesAndNotify()
   }, 4 * 60 * 60 * 1000)
+}
+
+// ===== Auto-Sync Functions =====
+
+interface ExportData {
+  version: string
+  exportDate: string
+  appVersion: string
+  progress: unknown[]
+  history: unknown[]
+}
+
+function getAutoSyncPreferences(): { enabled: boolean; folderPath: string | null } {
+  try {
+    const db = getDatabase()
+    const enabled = db.prepare('SELECT value FROM preferences WHERE key = ?').get('sync_enabled') as
+      | { value: string }
+      | undefined
+    const folderPath = db
+      .prepare('SELECT value FROM preferences WHERE key = ?')
+      .get('sync_folder_path') as { value: string } | undefined
+
+    return {
+      enabled: enabled?.value === 'true',
+      folderPath: folderPath?.value || null
+    }
+  } catch (error) {
+    console.error('Failed to get auto-sync preferences:', error)
+    return { enabled: false, folderPath: null }
+  }
+}
+
+function performAutoExport(folderPath: string): boolean {
+  try {
+    const db = getDatabase()
+
+    // Get export data
+    const progress = db
+      .prepare(
+        `
+      SELECT
+        p.neet_id,
+        pp.status,
+        pp.repetitions,
+        pp.interval,
+        pp.ease_factor,
+        pp.next_review_date,
+        pp.first_learned_at,
+        pp.last_reviewed_at,
+        pp.total_reviews
+      FROM problem_progress pp
+      JOIN problems p ON pp.problem_id = p.id
+      WHERE pp.total_reviews > 0
+      ORDER BY p.neet_id
+    `
+      )
+      .all()
+
+    const history = db
+      .prepare(
+        `
+      SELECT
+        p.neet_id,
+        rh.review_date,
+        rh.quality,
+        rh.interval_before,
+        rh.interval_after,
+        rh.ease_factor_before,
+        rh.ease_factor_after
+      FROM review_history rh
+      JOIN problems p ON rh.problem_id = p.id
+      ORDER BY rh.review_date
+    `
+      )
+      .all()
+
+    const exportData: ExportData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      appVersion: app.getVersion(),
+      progress,
+      history
+    }
+
+    const filePath = path.join(folderPath, 'cometode-progress.json')
+    writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf-8')
+
+    // Update last export date
+    db.prepare(
+      `
+      INSERT INTO preferences (key, value, updated_at)
+      VALUES ('last_export_date', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `
+    ).run(new Date().toISOString())
+
+    console.log(`Auto-export completed: ${progress.length} problems exported to ${filePath}`)
+    return true
+  } catch (error) {
+    console.error('Auto-export failed:', error)
+    return false
+  }
+}
+
+function checkAndPerformAutoExport(): void {
+  const today = new Date().toISOString().split('T')[0]
+
+  // Only export once per day
+  if (lastAutoExportDate === today) {
+    return
+  }
+
+  const { enabled, folderPath } = getAutoSyncPreferences()
+
+  if (!enabled || !folderPath) {
+    return
+  }
+
+  // Check if folder exists
+  if (!existsSync(folderPath)) {
+    console.warn(`Auto-sync folder does not exist: ${folderPath}`)
+    return
+  }
+
+  if (performAutoExport(folderPath)) {
+    lastAutoExportDate = today
+  }
+}
+
+function performAutoImportOnStartup(): void {
+  try {
+    const { enabled, folderPath } = getAutoSyncPreferences()
+
+    if (!enabled || !folderPath) {
+      return
+    }
+
+    const filePath = path.join(folderPath, 'cometode-progress.json')
+
+    // Check if file exists
+    if (!existsSync(filePath)) {
+      console.log('Auto-import: No sync file found, skipping')
+      return
+    }
+
+    // Read export file
+    const content = readFileSync(filePath, 'utf-8')
+    const exportData = JSON.parse(content) as ExportData
+
+    if (!exportData.exportDate || !exportData.progress) {
+      console.warn('Auto-import: Invalid file format')
+      return
+    }
+
+    const exportDate = new Date(exportData.exportDate)
+
+    // Get max last_reviewed_at from DB
+    const db = getDatabase()
+    const maxReview = db
+      .prepare('SELECT MAX(last_reviewed_at) as max_date FROM problem_progress')
+      .get() as { max_date: string | null }
+
+    const maxLocalDate = maxReview.max_date ? new Date(maxReview.max_date) : null
+
+    // Compare dates - import if export is newer
+    const shouldImport = !maxLocalDate || exportDate > maxLocalDate
+
+    if (!shouldImport) {
+      console.log('Auto-import: Local data is up to date, skipping')
+      return
+    }
+
+    console.log(`Auto-import: Importing data from ${exportData.exportDate}`)
+
+    // Perform import using transaction
+    let importedCount = 0
+
+    const transaction = db.transaction(() => {
+      for (const entry of exportData.progress as {
+        neet_id: number
+        status: string
+        repetitions: number
+        interval: number
+        ease_factor: number
+        next_review_date: string | null
+        first_learned_at: string | null
+        last_reviewed_at: string | null
+        total_reviews: number
+      }[]) {
+        const problem = db.prepare('SELECT id FROM problems WHERE neet_id = ?').get(entry.neet_id) as
+          | { id: number }
+          | undefined
+
+        if (!problem) continue
+
+        db.prepare(
+          `
+          INSERT INTO problem_progress
+          (problem_id, status, repetitions, interval, ease_factor, next_review_date, first_learned_at, last_reviewed_at, total_reviews)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(problem_id) DO UPDATE SET
+            status = excluded.status,
+            repetitions = excluded.repetitions,
+            interval = excluded.interval,
+            ease_factor = excluded.ease_factor,
+            next_review_date = excluded.next_review_date,
+            first_learned_at = excluded.first_learned_at,
+            last_reviewed_at = excluded.last_reviewed_at,
+            total_reviews = excluded.total_reviews
+        `
+        ).run(
+          problem.id,
+          entry.status,
+          entry.repetitions,
+          entry.interval,
+          entry.ease_factor,
+          entry.next_review_date,
+          entry.first_learned_at,
+          entry.last_reviewed_at,
+          entry.total_reviews
+        )
+
+        importedCount++
+      }
+
+      // Import history entries (append)
+      if (exportData.history && Array.isArray(exportData.history)) {
+        for (const entry of exportData.history as {
+          neet_id: number
+          review_date: string
+          quality: number
+          interval_before: number
+          interval_after: number
+          ease_factor_before: number
+          ease_factor_after: number
+        }[]) {
+          const problem = db.prepare('SELECT id FROM problems WHERE neet_id = ?').get(entry.neet_id) as
+            | { id: number }
+            | undefined
+
+          if (!problem) continue
+
+          // Check if this history entry already exists (avoid duplicates)
+          const existing = db
+            .prepare(
+              'SELECT id FROM review_history WHERE problem_id = ? AND review_date = ? AND quality = ?'
+            )
+            .get(problem.id, entry.review_date, entry.quality)
+
+          if (!existing) {
+            db.prepare(
+              `
+              INSERT INTO review_history
+              (problem_id, review_date, quality, interval_before, interval_after, ease_factor_before, ease_factor_after)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `
+            ).run(
+              problem.id,
+              entry.review_date,
+              entry.quality,
+              entry.interval_before,
+              entry.interval_after,
+              entry.ease_factor_before,
+              entry.ease_factor_after
+            )
+          }
+        }
+      }
+
+      // Update last import date
+      db.prepare(
+        `
+        INSERT INTO preferences (key, value, updated_at)
+        VALUES ('last_import_date', ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `
+      ).run(new Date().toISOString())
+    })
+
+    transaction()
+
+    console.log(`Auto-import completed: ${importedCount} problems imported`)
+
+    // Show notification
+    const notification = new Notification({
+      title: 'Cometode Sync',
+      body: `Imported ${importedCount} problems from sync folder`,
+      icon: icon
+    })
+    notification.show()
+  } catch (error) {
+    console.error('Auto-import failed:', error)
+  }
 }
 
 // Set flag before quitting to allow window to close

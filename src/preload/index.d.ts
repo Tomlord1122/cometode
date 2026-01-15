@@ -118,6 +118,32 @@ export interface API {
   showOpenDialog: () => Promise<string | null>
   writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
+
+  // Auto-Sync
+  getAutoSyncPreferences: () => Promise<{
+    enabled: boolean
+    folderPath: string | null
+    lastExportDate: string | null
+    lastImportDate: string | null
+  }>
+  setAutoSyncPreferences: (data: {
+    enabled: boolean
+    folderPath?: string
+  }) => Promise<{ success: boolean }>
+  showFolderDialog: () => Promise<string | null>
+  performAutoExport: (folderPath: string) => Promise<{
+    success: boolean
+    exportedCount?: number
+    error?: string
+  }>
+  checkAutoImport: (folderPath: string) => Promise<{
+    shouldImport: boolean
+    exportDate?: string
+    maxLocalDate?: string | null
+    data?: ExportData | null
+    reason?: string
+  }>
+  setLastImportDate: () => Promise<{ success: boolean }>
 }
 
 declare global {
