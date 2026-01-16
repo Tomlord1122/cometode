@@ -338,7 +338,7 @@
     <div class="flex items-center gap-1">
       <button
         onclick={openSettings}
-        class="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        class="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-all hover:scale-105 cursor-pointer"
         title="Settings"
       >
         <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
