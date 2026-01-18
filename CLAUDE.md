@@ -28,7 +28,7 @@ A macOS menu bar app for tracking coding problem practice using Anki-style SM-2 
 - Daily notifications for due reviews
 - Dark/Light/System theme support
 - Export/Import progress as JSON
-- Auto-sync: daily export to user folder (Dropbox/iCloud) + auto-import on startup
+- Auto-sync: export after each review to user folder (Dropbox/iCloud) + auto-import on startup
 - Auto-updates from GitHub releases
 
 ## Project Structure
