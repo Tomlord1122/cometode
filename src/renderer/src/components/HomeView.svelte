@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slide } from 'svelte/transition'
   import { problems, filters, todayReviews, loadProblems, loadTodayReviews, loadCategories, filterUIState, currentProblemSet, setProblemSet, initProblemSet } from '../stores/problems'
   import { stats, loadStats } from '../stores/stats'
   import type { Problem, ProblemSet } from '../../../preload/index.d'
@@ -105,13 +106,13 @@
     <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
       <button
         onclick={() => handleProblemSetChange('neetcode150')}
-        class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all {$currentProblemSet === 'neetcode150' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+        class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer hover:scale-105 {$currentProblemSet === 'neetcode150' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}" 
       >
         NeetCode 150
       </button>
       <button
         onclick={() => handleProblemSetChange('google')}
-        class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all {$currentProblemSet === 'google' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
+        class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all  cursor-pointer hover:scale-105 {$currentProblemSet === 'google' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}"
       >
         Google
       </button>
@@ -125,7 +126,7 @@
       <div class="text-2xl font-bold">{$todayReviews.length} problem{$todayReviews.length > 1 ? 's' : ''}</div>
       <button
         onclick={onStartReview}
-        class="mt-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-md text-sm font-medium transition-colors"
+        class="mt-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-md text-sm font-medium transition-all hover:scale-105  cursor-pointer"
       >
         Start Review
       </button>
@@ -162,20 +163,22 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
+
       <button
         onclick={selectRandomProblem}
         disabled={$problems.length === 0}
         title="Select a random problem"
-        class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+        class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer"
       >
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 512 512">
           <path d="M403.8 34.4c12-5 25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6l0-32-32 0c-10.1 0-19.6 4.7-25.6 12.8L284 229.3 244 176l31.2-41.6C293.3 110.2 321.8 96 352 96l32 0 0-32c0-12.9 7.8-24.6 19.8-29.6zM164 282.7L204 336l-31.2 41.6C154.7 401.8 126.2 416 96 416l-64 0c-17.7 0-32-14.3-32-32s14.3-32 32-32l64 0c10.1 0 19.6-4.7 25.6-12.8L164 282.7zm274.6 188c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6l0-32-32 0c-30.2 0-58.7-14.2-76.8-38.4L121.6 172.8c-6-8.1-15.5-12.8-25.6-12.8l-64 0c-17.7 0-32-14.3-32-32s14.3-32 32-32l64 0c30.2 0 58.7 14.2 76.8 38.4L326.4 339.2c6 8.1 15.5 12.8 25.6 12.8l32 0 0-32c0-12.9 7.8-24.6 19.8-29.6s25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64z" />
         </svg>
       </button>
+
       <div class="relative">
         <button
           onclick={() => showFilterMenu = !showFilterMenu}
-          class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {hasActiveFilters ? 'text-blue-500' : 'text-gray-500'}"
+          class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {hasActiveFilters ? 'text-blue-500' : 'text-gray-500'} cursor-pointer"
           title="Filter problems"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +189,7 @@
         <!-- Filter Dropdown -->
         {#if showFilterMenu}
           <div
-            class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10"
+            class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10 cursor-pointer"
             role="menu"
             tabindex="-1"
             onclick={(e) => e.stopPropagation()}
@@ -200,7 +203,7 @@
                     onclick={() => {
                       selectedDifficulty = selectedDifficulty === diff ? null : diff
                     }}
-                    class="flex-1 px-2 py-1 text-xs rounded transition-colors {selectedDifficulty === diff ? 'bg-indigo-400/90 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'}"
+                    class="flex-1 px-2 py-1 text-xs rounded transition-colors {selectedDifficulty === diff ? 'bg-indigo-400/90 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'} cursor-pointer"
                   >
                     {diff}
                   </button>
@@ -244,9 +247,10 @@
 
   <!-- Problem List -->
   <div class="flex-1 overflow-y-auto">
-    {#each $problems as problem (problem.id)}
+    {#each $problems as problem, index (problem.id)}
       {@const status = getProblemStatus(problem)}
       <button
+        transition:slide={{ duration: 300, delay: (index * 20) % 100 }}
         onclick={() => onSelectProblem(problem)}
         class="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 text-left transition-colors"
       >

@@ -16,7 +16,7 @@
 <button
   onclick={() => theme.toggle()}
   class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700
-         text-gray-600 dark:text-gray-400 transition-colors"
+         text-gray-600 dark:text-gray-400 transition-all hover:scale-105 cursor-pointer"
   title="Toggle theme ({getLabel($theme)})"
 >
   {#if $theme === 'light'}

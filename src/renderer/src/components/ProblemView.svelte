@@ -123,7 +123,7 @@
           href={problem.neetcode_url}
           target="_blank"
           rel="noopener noreferrer"
-          class="flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-400/90 hover:bg-orange-500/95 text-white rounded-md text-sm font-medium transition-colors shadow-sm"
+          class="flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-400/90 hover:bg-orange-500/95 text-white rounded-md text-sm font-medium transition-all shadow-sm hover:scale-105"
         >
           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
@@ -170,7 +170,7 @@
               <button
                 onclick={() => handleReview(option.value)}
                 disabled={isSubmitting}
-                class="py-2 {option.color} text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 border-gray-300" 
+                class="py-2 {option.color} text-white rounded-md text-sm font-medium  disabled:opacity-50 border-gray-300 hover:scale-105 transition-all  cursor-pointer" 
               >
                 <div>{option.label}</div>
                 <div class="text-xs opacity-75">{option.description}</div>
