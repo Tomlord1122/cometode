@@ -463,7 +463,6 @@ interface ExportData {
   exportDate: string
   appVersion: string
   progress: unknown[]
-  history: unknown[]
 }
 
 function getAutoSyncPreferences(): { enabled: boolean; folderPath: string | null } {
@@ -512,30 +511,11 @@ function performAutoExport(folderPath: string): boolean {
       )
       .all()
 
-    const history = db
-      .prepare(
-        `
-      SELECT
-        p.neet_id,
-        rh.review_date,
-        rh.quality,
-        rh.interval_before,
-        rh.interval_after,
-        rh.ease_factor_before,
-        rh.ease_factor_after
-      FROM review_history rh
-      JOIN problems p ON rh.problem_id = p.id
-      ORDER BY rh.review_date
-    `
-      )
-      .all()
-
     const exportData: ExportData = {
       version: '1.0',
       exportDate: new Date().toISOString(),
       appVersion: app.getVersion(),
-      progress,
-      history
+      progress
     }
 
     const filePath = path.join(folderPath, 'cometode-progress.json')
@@ -677,50 +657,6 @@ function performAutoImportOnStartup(): void {
         )
 
         importedCount++
-      }
-
-      // Import history entries (append)
-      if (exportData.history && Array.isArray(exportData.history)) {
-        for (const entry of exportData.history as {
-          neet_id: number
-          review_date: string
-          quality: number
-          interval_before: number
-          interval_after: number
-          ease_factor_before: number
-          ease_factor_after: number
-        }[]) {
-          const problem = db.prepare('SELECT id FROM problems WHERE neet_id = ?').get(entry.neet_id) as
-            | { id: number }
-            | undefined
-
-          if (!problem) continue
-
-          // Check if this history entry already exists (avoid duplicates)
-          const existing = db
-            .prepare(
-              'SELECT id FROM review_history WHERE problem_id = ? AND review_date = ? AND quality = ?'
-            )
-            .get(problem.id, entry.review_date, entry.quality)
-
-          if (!existing) {
-            db.prepare(
-              `
-              INSERT INTO review_history
-              (problem_id, review_date, quality, interval_before, interval_after, ease_factor_before, ease_factor_after)
-              VALUES (?, ?, ?, ?, ?, ?, ?)
-            `
-            ).run(
-              problem.id,
-              entry.review_date,
-              entry.quality,
-              entry.interval_before,
-              entry.interval_after,
-              entry.ease_factor_before,
-              entry.ease_factor_after
-            )
-          }
-        }
       }
 
       // Update last import date

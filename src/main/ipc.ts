@@ -39,22 +39,11 @@ interface ExportProgressEntry {
   total_reviews: number
 }
 
-interface ExportHistoryEntry {
-  neet_id: number
-  review_date: string
-  quality: number
-  interval_before: number
-  interval_after: number
-  ease_factor_before: number
-  ease_factor_after: number
-}
-
 interface ExportData {
   version: string
   exportDate: string
   appVersion: string
   progress: ExportProgressEntry[]
-  history: ExportHistoryEntry[]
 }
 
 export function setupIPC(db: Database.Database): void {
@@ -244,21 +233,6 @@ export function setupIPC(db: Database.Database): void {
         nextReviewStr
       )
 
-      // Record history
-      db.prepare(
-        `
-        INSERT INTO review_history
-        (problem_id, quality, interval_before, interval_after, ease_factor_before, ease_factor_after)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `
-      ).run(
-        problemId,
-        quality,
-        currentState.interval,
-        newState.interval,
-        currentState.easeFactor,
-        newState.easeFactor
-      )
     })
 
     transaction()
@@ -337,23 +311,19 @@ export function setupIPC(db: Database.Database): void {
     }
     const todayDue = db.prepare(todayDueQuery).get() as { count: number }
 
-    const reviewHistory = db
-      .prepare(
-        `
-      SELECT
-        DATE(review_date) as date,
-        COUNT(*) as count
-      FROM review_history
-      GROUP BY DATE(review_date)
-      ORDER BY date DESC
-      LIMIT 30
+    // Calculate total reviews from problem_progress
+    let totalReviewsQuery = `
+      SELECT COALESCE(SUM(pp.total_reviews), 0) as count
+      FROM problem_progress pp
+      JOIN problems p ON pp.problem_id = p.id
+      WHERE 1=1
     `
-      )
-      .all()
-
-    const totalReviews = db.prepare('SELECT COUNT(*) as count FROM review_history').get() as {
-      count: number
+    if (problemSet === 'neetcode150') {
+      totalReviewsQuery += ' AND p.in_neetcode_150 = 1'
+    } else if (problemSet === 'google') {
+      totalReviewsQuery += ' AND p.in_google = 1'
     }
+    const totalReviews = db.prepare(totalReviewsQuery).get() as { count: number }
 
     // For practiced, join with problems to filter by set
     let practicedQuery = `
@@ -376,7 +346,7 @@ export function setupIPC(db: Database.Database): void {
       totalReviews: totalReviews.count,
       byDifficulty,
       byCategory,
-      reviewHistory
+      reviewHistory: [] // No longer tracking daily history
     }
   })
 
@@ -449,25 +419,6 @@ export function setupIPC(db: Database.Database): void {
     return { success: true }
   })
 
-  // Clean up duplicate history entries
-  ipcMain.handle('cleanup-duplicate-history', () => {
-    // Find and delete duplicate entries, keeping only the first one (lowest id)
-    const result = db
-      .prepare(
-        `
-      DELETE FROM review_history
-      WHERE id NOT IN (
-        SELECT MIN(id)
-        FROM review_history
-        GROUP BY problem_id, review_date, quality
-      )
-    `
-      )
-      .run()
-
-    return { success: true, deletedCount: result.changes }
-  })
-
   // Export progress data
   ipcMain.handle('export-progress', () => {
     const progress = db
@@ -491,30 +442,11 @@ export function setupIPC(db: Database.Database): void {
       )
       .all() as ExportProgressEntry[]
 
-    const history = db
-      .prepare(
-        `
-      SELECT
-        p.neet_id,
-        rh.review_date,
-        rh.quality,
-        rh.interval_before,
-        rh.interval_after,
-        rh.ease_factor_before,
-        rh.ease_factor_after
-      FROM review_history rh
-      JOIN problems p ON rh.problem_id = p.id
-      ORDER BY rh.review_date
-    `
-      )
-      .all() as ExportHistoryEntry[]
-
     const exportData: ExportData = {
       version: '1.0',
       exportDate: new Date().toISOString(),
       appVersion: app.getVersion(),
-      progress,
-      history
+      progress
     }
 
     return exportData
@@ -567,42 +499,6 @@ export function setupIPC(db: Database.Database): void {
         )
 
         importedCount++
-      }
-
-      // Import history entries (append, don't replace, with deduplication)
-      if (data.history && Array.isArray(data.history)) {
-        for (const entry of data.history) {
-          const problem = db
-            .prepare('SELECT id FROM problems WHERE neet_id = ?')
-            .get(entry.neet_id) as { id: number } | undefined
-
-          if (!problem) continue
-
-          // Check if this history entry already exists (avoid duplicates)
-          const existing = db
-            .prepare(
-              'SELECT id FROM review_history WHERE problem_id = ? AND review_date = ? AND quality = ?'
-            )
-            .get(problem.id, entry.review_date, entry.quality)
-
-          if (!existing) {
-            db.prepare(
-              `
-              INSERT INTO review_history
-              (problem_id, review_date, quality, interval_before, interval_after, ease_factor_before, ease_factor_after)
-              VALUES (?, ?, ?, ?, ?, ?, ?)
-            `
-            ).run(
-              problem.id,
-              entry.review_date,
-              entry.quality,
-              entry.interval_before,
-              entry.interval_after,
-              entry.ease_factor_before,
-              entry.ease_factor_after
-            )
-          }
-        }
       }
     })
 
@@ -747,30 +643,11 @@ export function setupIPC(db: Database.Database): void {
         )
         .all() as ExportProgressEntry[]
 
-      const history = db
-        .prepare(
-          `
-        SELECT
-          p.neet_id,
-          rh.review_date,
-          rh.quality,
-          rh.interval_before,
-          rh.interval_after,
-          rh.ease_factor_before,
-          rh.ease_factor_after
-        FROM review_history rh
-        JOIN problems p ON rh.problem_id = p.id
-        ORDER BY rh.review_date
-      `
-        )
-        .all() as ExportHistoryEntry[]
-
       const exportData: ExportData = {
         version: '1.0',
         exportDate: new Date().toISOString(),
         appVersion: app.getVersion(),
-        progress,
-        history
+        progress
       }
 
       const filePath = path.join(folderPath, 'cometode-progress.json')

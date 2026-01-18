@@ -71,22 +71,11 @@ export interface ExportProgressEntry {
   total_reviews: number
 }
 
-export interface ExportHistoryEntry {
-  neet_id: number
-  review_date: string
-  quality: number
-  interval_before: number
-  interval_after: number
-  ease_factor_before: number
-  ease_factor_after: number
-}
-
 export interface ExportData {
   version: string
   exportDate: string
   appVersion: string
   progress: ExportProgressEntry[]
-  history: ExportHistoryEntry[]
 }
 
 export interface API {
@@ -100,7 +89,6 @@ export interface API {
   savePreference: (data: { key: string; value: string }) => Promise<{ success: boolean }>
   getPreference: (key: string) => Promise<string | null>
   resetAllProgress: () => Promise<{ success: boolean }>
-  cleanupDuplicateHistory: () => Promise<{ success: boolean; deletedCount: number }>
   hidePopup: () => Promise<{ success: boolean }>
   getShortcut: () => Promise<string>
   setShortcut: (shortcut: string) => Promise<{ success: boolean; shortcut: string }>
