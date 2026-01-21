@@ -23,7 +23,7 @@ export interface Problem {
 }
 
 export interface ProblemFilters {
-  difficulty?: string
+  difficulty?: string[]
   category?: string
   status?: string
   searchText?: string

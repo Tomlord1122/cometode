@@ -13,7 +13,7 @@
 
   // Use store values for filter state persistence
   let searchText = $state($filterUIState.searchText)
-  let selectedDifficulty = $state<string | null>($filterUIState.selectedDifficulty)
+  let selectedDifficulties = $state<string[]>([...$filterUIState.selectedDifficulties])
   let showDueOnly = $state($filterUIState.showDueOnly)
   let showFilterMenu = $state($filterUIState.showFilterMenu)
 
@@ -21,7 +21,7 @@
   $effect(() => {
     filterUIState.set({
       searchText,
-      selectedDifficulty,
+      selectedDifficulties,
       showDueOnly,
       showFilterMenu
     })
@@ -39,10 +39,12 @@
   // Handle problem set change
   async function handleProblemSetChange(set: ProblemSet): Promise<void> {
     await setProblemSet(set)
-    const newFilters: typeof $filters = { problemSet: set }
-    if (searchText) newFilters.searchText = searchText
-    if (selectedDifficulty) newFilters.difficulty = selectedDifficulty
-    if (showDueOnly) newFilters.dueOnly = true
+    const newFilters: typeof $filters = {
+      problemSet: set,
+      difficulty: [...selectedDifficulties],
+      searchText: searchText || undefined,
+      dueOnly: showDueOnly || undefined
+    }
     filters.set(newFilters)
     await Promise.all([
       loadProblems(newFilters),
@@ -53,10 +55,14 @@
 
   // Apply filters when search/filter changes
   $effect(() => {
-    const newFilters: typeof $filters = { problemSet: $currentProblemSet }
-    if (searchText) newFilters.searchText = searchText
-    if (selectedDifficulty) newFilters.difficulty = selectedDifficulty
-    if (showDueOnly) newFilters.dueOnly = true
+    // Spread to ensure Svelte tracks the array contents
+    const difficulties = [...selectedDifficulties]
+    const newFilters: typeof $filters = {
+      problemSet: $currentProblemSet,
+      difficulty: difficulties,
+      searchText: searchText || undefined,
+      dueOnly: showDueOnly || undefined
+    }
     filters.set(newFilters)
     loadProblems(newFilters)
   })
@@ -83,7 +89,7 @@
 
   function clearFilters(): void {
     searchText = ''
-    selectedDifficulty = null
+    selectedDifficulties = []
     showDueOnly = false
   }
 
@@ -93,7 +99,7 @@
     onSelectProblem($problems[randomIndex])
   }
 
-  const hasActiveFilters = $derived(!!searchText || !!selectedDifficulty || showDueOnly)
+  const hasActiveFilters = $derived(!!searchText || selectedDifficulties.length > 0 || showDueOnly)
 
   const progressPercentage = $derived(
     $stats ? Math.round(($stats.practiced / $stats.total) * 100) : 0
@@ -201,9 +207,13 @@
                 {#each ['Easy', 'Medium', 'Hard'] as diff}
                   <button
                     onclick={() => {
-                      selectedDifficulty = selectedDifficulty === diff ? null : diff
+                      if (selectedDifficulties.includes(diff)) {
+                        selectedDifficulties = selectedDifficulties.filter(d => d !== diff)
+                      } else {
+                        selectedDifficulties = [...selectedDifficulties, diff]
+                      }
                     }}
-                    class="flex-1 px-2 py-1 text-xs rounded transition-colors {selectedDifficulty === diff ? 'bg-indigo-400/90 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'} cursor-pointer"
+                    class="flex-1 px-2 py-1 text-xs rounded transition-colors {selectedDifficulties.includes(diff) ? 'bg-indigo-400/90 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'} cursor-pointer"
                   >
                     {diff}
                   </button>

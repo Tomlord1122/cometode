@@ -24,7 +24,7 @@ export async function setProblemSet(set: ProblemSet): Promise<void> {
 
 // Current filters
 export const filters = writable<ProblemFilters>({
-  difficulty: '',
+  difficulty: [],
   category: '',
   status: '',
   searchText: '',
@@ -35,12 +35,12 @@ export const filters = writable<ProblemFilters>({
 // UI filter state (persists across view changes)
 export const filterUIState = writable<{
   searchText: string
-  selectedDifficulty: string | null
+  selectedDifficulties: string[]
   showDueOnly: boolean
   showFilterMenu: boolean
 }>({
   searchText: '',
-  selectedDifficulty: null,
+  selectedDifficulties: [],
   showDueOnly: false,
   showFilterMenu: false
 })

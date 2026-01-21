@@ -83,9 +83,10 @@ export function setupIPC(db: Database.Database): void {
     }
     // 'all' or undefined means no filter
 
-    if (filters?.difficulty) {
-      query += ' AND p.difficulty = ?'
-      params.push(filters.difficulty)
+    if (filters?.difficulty && filters.difficulty.length > 0) {
+      const placeholders = filters.difficulty.map(() => '?').join(', ')
+      query += ` AND p.difficulty IN (${placeholders})`
+      params.push(...filters.difficulty)
     }
 
     if (filters?.category) {
