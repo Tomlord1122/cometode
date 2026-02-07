@@ -3,7 +3,13 @@
   import HomeView from './components/HomeView.svelte'
   import ProblemView from './components/ProblemView.svelte'
   import ThemeToggle from './components/ThemeToggle.svelte'
-  import { todayReview, loadTodayReviews, loadProblems, currentProblemSet } from './stores/problems'
+  import {
+    todayReview,
+    loadTodayReviews,
+    loadProblems,
+    currentProblemSet,
+    isReviewQueueProblem
+  } from './stores/problems'
   import { loadStats } from './stores/stats'
   import { theme } from './stores/theme'
   import type { Problem } from '../../preload/index.d'
@@ -86,7 +92,8 @@
   }
 
   async function goHome(): Promise<void> {
-    // Don't reload reviews - maintain current session state
+    // Reset review queue flag in case user navigated away without completing review
+    isReviewQueueProblem.set(false)
     selectedProblem = null
     currentView = 'home'
   }

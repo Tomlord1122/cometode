@@ -57,6 +57,9 @@ export const todayReview = writable<Problem | null>(null)
 // Today's total review count
 export const todayReviewsCount = writable<number>(0)
 
+// Track if current problem is from review queue (for session counting)
+export const isReviewQueueProblem = writable<boolean>(false)
+
 // Completed reviews in current session (persists until app restart or manual reset)
 export const completedInSession = writable<number>(0)
 
@@ -137,9 +140,17 @@ export async function loadMoreReviews(problemSet?: ProblemSet): Promise<void> {
 }
 
 export function markReviewCompleted(): void {
-  // Increment completed count and clear current review
-  completedInSession.update((count) => count + 1)
-  todayReview.set(null)
+  // Only increment session count if this was a review queue problem
+  let isFromQueue = false
+  isReviewQueueProblem.subscribe((v) => (isFromQueue = v))()
+
+  if (isFromQueue) {
+    completedInSession.update((count) => count + 1)
+    todayReview.set(null)
+  }
+
+  // Always reset the flag after review
+  isReviewQueueProblem.set(false)
 }
 
 export async function loadCategories(): Promise<void> {

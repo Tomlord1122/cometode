@@ -14,7 +14,8 @@
     filterUIState,
     currentProblemSet,
     setProblemSet,
-    initProblemSet
+    initProblemSet,
+    isReviewQueueProblem
   } from '../stores/problems'
   import { stats, loadStats } from '../stores/stats'
   import type { Problem, ProblemSet } from '../../../preload/index.d'
@@ -151,6 +152,8 @@
   // Start review with the current problem
   function handleStartReview(): void {
     if ($todayReview) {
+      // Mark this as a review queue problem so session count is incremented
+      isReviewQueueProblem.set(true)
       onSelectProblem($todayReview)
     }
   }
@@ -206,9 +209,7 @@
       {:else if $completedInSession >= sessionQuota && $completedInSession > 0}
         <!-- Quota completed -->
         <div class="flex flex-col items-center justify-center h-full">
-          <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            ✨ Session completed
-          </div>
+          <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">✨ Session completed</div>
           {#if $todayReviewsCount > 0}
             <div class="text-xs text-gray-400 dark:text-gray-500 mb-2">
               {$todayReviewsCount} more review{$todayReviewsCount > 1 ? 's' : ''} available
