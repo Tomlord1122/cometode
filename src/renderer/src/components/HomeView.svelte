@@ -207,7 +207,7 @@
         <!-- Quota completed -->
         <div class="flex flex-col items-center justify-center h-full">
           <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            ✨ Session completed ({$completedInSession}/{sessionQuota})
+            ✨ Session completed
           </div>
           {#if $todayReviewsCount > 0}
             <div class="text-xs text-gray-400 dark:text-gray-500 mb-2">
