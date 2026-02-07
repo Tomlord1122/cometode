@@ -60,8 +60,28 @@ export const todayReviewsCount = writable<number>(0)
 // Completed reviews in current session (persists until app restart or manual reset)
 export const completedInSession = writable<number>(0)
 
+// Track the date when the current session started (for auto-reset on new day)
+let sessionDate: string | null = null
+
 // Max reviews per session
 export const MAX_REVIEWS_PER_SESSION = 5
+
+// Get today's date string in local timezone (YYYY-MM-DD)
+function getLocalDateString(): string {
+  const today = new Date()
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+}
+
+// Check if session should be reset (new day started)
+function checkAndResetSessionIfNewDay(): boolean {
+  const today = getLocalDateString()
+  if (sessionDate !== today) {
+    sessionDate = today
+    completedInSession.set(0)
+    return true
+  }
+  return false
+}
 
 // Categories
 export const categories = writable<string[]>([])
@@ -98,7 +118,9 @@ export async function loadProblems(currentFilters?: ProblemFilters): Promise<voi
 
 export async function loadTodayReviews(problemSet?: ProblemSet): Promise<void> {
   try {
-    // Don't reset completedInSession here - it persists across reloads
+    // Auto-reset session if a new day has started
+    checkAndResetSessionIfNewDay()
+
     const data = await window.api.getTodayReviews(problemSet, 0)
     const count = await window.api.getTodayReviewsCount(problemSet)
     todayReview.set(data.length > 0 ? data[0] : null)
